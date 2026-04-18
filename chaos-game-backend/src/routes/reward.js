@@ -65,7 +65,7 @@ router.post('/', async (req, res) => {
     });
 
     // Get all unlocked reward IDs from DB for this user
-    const dbUnlocked = db.prepare('SELECT reward_id FROM unlocked_rewards WHERE session_id = ?').all();
+    const dbUnlocked = db.prepare('SELECT reward_id FROM unlocked_rewards WHERE session_id = ?').all(sessionId);
     const unlockedIds = new Set(dbUnlocked.map(row => row.reward_id));
 
     // AI Judgment

@@ -92,14 +92,24 @@ export default function UploadScreen({ task, onSubmit }: UploadScreenProps) {
           </button>
         ) : (
           <div 
-            className="w-full rounded-2xl overflow-hidden border-2 animate-rborder"
+            className="w-full rounded-2xl overflow-hidden border-2 animate-rborder bg-black"
             style={{ aspectRatio: '1' }}
           >
-            <img 
-              src={preview} 
-              alt="Preview" 
-              className="w-full h-full object-cover"
-            />
+            {file?.type.startsWith('video/') ? (
+              <video 
+                src={preview!}
+                className="w-full h-full object-cover"
+                controls
+                muted
+                playsInline
+              />
+            ) : (
+              <img 
+                src={preview!} 
+                alt="Preview" 
+                className="w-full h-full object-cover"
+              />
+            )}
           </div>
         )}
         
