@@ -16,11 +16,11 @@ const hf = new HfInference(process.env.HF_TOKEN);
 async function generateTask(difficulty) {
   let difficultyConstraint = "";
   if (difficulty === 'easy') {
-    difficultyConstraint = "simple silly tasks (example: wave at a stranger, touch your toes)";
+    difficultyConstraint = "simple, silly, and safe tasks that can be done instantly (e.g., 'Do a silly dance for 5 seconds', 'Take a selfie with a spoon'). Focus on low-effort fun.";
   } else if (difficulty === 'medium') {
-    difficultyConstraint = "more effort needed (example: do 10 pushups, balance a book on your head)";
+    difficultyConstraint = "tasks requiring moderate effort, coordination, or mild social bravery (e.g., 'Do 15 squats while singing a song', 'Balance a full glass of water on your palm for 20 seconds'). No simple selfies.";
   } else if (difficulty === 'hard') {
-    difficultyConstraint = "chaotic and challenging (example: bark like a dog outside for 10 seconds, do a handstand)";
+    difficultyConstraint = "genuinely challenging, unhinged, or physically demanding tasks (e.g., 'Do a handstand against a wall for 10 seconds', 'Bark like a dog loudly in a public area or hallway', 'Hold a plank for 60 seconds while describing your deepest fear'). Must be undeniably difficult.";
   }
 
   const response = await groq.chat.completions.create({
@@ -45,17 +45,20 @@ Return a JSON object with:
 
 
 // ── 2. VERIFY IMAGE ──────────────────────────────────────────────────
-// Still uses Hugging Face CLIP for image checking
+// Uses Hugging Face CLIP for zero-shot image classification
 async function verifyImage(imagePath, taskLabel) {
   const imageData = fs.readFileSync(imagePath);
 
+  // We add specialized "Hard Negatives" to force CLIP to be more specific.
+  // If we only give it the taskLabel, it might default to it even for poor matches.
   const candidateLabels = [
     taskLabel,
-    'random object',
-    'person',
-    'food',
-    'outdoor scene',
-    'nothing relevant'
+    `a photo of a person ${taskLabel}`,
+    'a blank or blurry screen',
+    'a static room with no activity',
+    'random household objects',
+    'a person doing something completely different',
+    'nonsense'
   ];
 
   try {
@@ -65,8 +68,19 @@ async function verifyImage(imagePath, taskLabel) {
       parameters: { candidate_labels: candidateLabels }
     });
 
-    const topResult = result[0];
-    const passed = topResult.label === taskLabel && topResult.score > 0.3;
+    // Sort results to see the top match
+    const sorted = result.sort((a, b) => b.score - a.score);
+    const topResult = sorted[0];
+
+    // Logging all scores for backend transparency
+    console.log(`[CLIP Scores] Top 3:`);
+    sorted.slice(0, 3).forEach((r, i) => console.log(`  ${i+1}. ${r.label}: ${(r.score * 100).toFixed(1)}%`));
+
+    // STRICTOR RULES:
+    // 1. Top label must actually be the task label (or its persona version)
+    // 2. Score must be > 0.55 (previously 0.3)
+    const isTaskLabel = topResult.label === taskLabel || topResult.label.includes(taskLabel);
+    const passed = isTaskLabel && topResult.score > 0.55;
 
     return {
       passed,

@@ -8,7 +8,9 @@ const db = require('../database/db');
 router.post('/', async (req, res) => {
   try {
     const { difficulty = 'easy', sessionId } = req.body || {};
-    console.log(`[Task] Generating ${difficulty} task for session: ${sessionId || 'anonymous'}`);
+    console.log(`--------------------------------------------------`);
+    console.log(`[Task Request] Difficulty: ${difficulty.toUpperCase()}`);
+    console.log(`[Task Request] Session: ${sessionId || 'anonymous'}`);
 
     // Validate difficulty
     const allowed = ['easy', 'medium', 'hard'];

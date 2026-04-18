@@ -97,4 +97,56 @@ router.post('/:sessionId/update', (req, res) => {
   }
 });
 
+// GET /api/session/:sessionId/stats
+// Returns aggregated stats for the dashboard
+router.get('/:sessionId/stats', (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    // 1. Category Breakdown
+    const categoryStmt = db.prepare(`
+      SELECT task_label as name, COUNT(*) as total, SUM(passed) as completed
+      FROM task_history
+      WHERE session_id = ?
+      GROUP BY task_label
+    `);
+    const categories = categoryStmt.all(sessionId);
+
+    // 2. Point History (for sparkline)
+    const historyStmt = db.prepare(`
+      SELECT points_earned, created_at
+      FROM task_history
+      WHERE session_id = ?
+      ORDER BY created_at ASC
+      LIMIT 20
+    `);
+    const history = historyStmt.all(sessionId);
+
+    // 3. Overall Stats
+    const user = db.prepare('SELECT total_score, tasks_completed FROM users WHERE session_id = ?').get(sessionId);
+
+    res.json({
+      score: user?.total_score || 0,
+      tasksCompleted: user?.tasks_completed || 0,
+      categories: categories.map(c => ({
+        name: c.name,
+        completed: c.completed,
+        total: c.total,
+        color: ['#ff4d00', '#ff00aa', '#bf5fff', '#00e5ff', '#39ff14', '#ffd60a'][Math.floor(Math.random() * 6)]
+      })),
+      history: history.map(h => h.points_earned),
+      recentActivity: history.slice(-5).reverse().map(h => ({
+        type: h.points_earned > 0 ? 'approved' : 'rejected',
+        text: 'Task Attempt',
+        points: h.points_earned,
+        time: 'recent'
+      }))
+    });
+
+  } catch (error) {
+    console.error('[Stats Error]:', error.message);
+    res.status(500).json({ error: 'Failed to fetch session stats' });
+  }
+});
+
 module.exports = router;

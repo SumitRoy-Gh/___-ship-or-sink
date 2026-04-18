@@ -20,12 +20,21 @@ const BADGES = [
   { emoji: '🌀', label: 'Chaos Agent', color: '#bf5fff' },
 ]
 
+interface DashboardStats {
+  score: number;
+  tasksCompleted: number;
+  categories: Array<{ name: string; completed: number; total: number; color: string }>;
+  history: number[];
+  recentActivity: Array<{ type: 'approved' | 'rejected' | 'spin'; text: string; points: number; time: string }>;
+}
+
 interface DashboardScreenProps {
   score: number
   tasksCompleted: number
   passedTasks: number
   hardFails: number
   recentActivity: { type: 'approved' | 'rejected' | 'spin'; text: string; points: number; time: string }[]
+  stats: DashboardStats | null
 }
 
 export default function DashboardScreen({ 
@@ -33,11 +42,25 @@ export default function DashboardScreen({
   tasksCompleted, 
   passedTasks, 
   hardFails,
-  recentActivity 
+  recentActivity: localRecentActivity,
+  stats
 }: DashboardScreenProps) {
   const sparklineRef = useRef<HTMLCanvasElement>(null)
-  const passRate = tasksCompleted > 0 ? Math.round((passedTasks / tasksCompleted) * 100) : 0
-  const masteryLevel = Math.min(100, Math.round(score / 14.2)) // Max at ~1420 points
+  
+  // Use stats from backend if available, otherwise local/mock
+  const displayScore = stats?.score ?? score
+  const displayTasksCompleted = stats?.tasksCompleted ?? tasksCompleted
+  const displayCategories = stats?.categories ?? [
+    { name: 'Selfie', completed: 0, total: 1, color: '#ff4d00' },
+    { name: 'Action', completed: 0, total: 1, color: '#ff00aa' },
+  ]
+  const displayHistory = stats?.history ?? []
+  const displayActivity = (stats?.recentActivity && stats.recentActivity.length > 0) 
+    ? stats.recentActivity 
+    : localRecentActivity
+
+  const passRate = displayTasksCompleted > 0 ? Math.round((passedTasks / displayTasksCompleted) * 100) : 0
+  const masteryLevel = Math.min(100, Math.round(displayScore / 14.2))
   
   const masteryTier = useMemo(() => {
     if (masteryLevel <= 30) return { name: 'Absolute Beginner 🥚', color: '#666' }
@@ -62,54 +85,43 @@ export default function DashboardScreen({
     
     const width = canvas.offsetWidth
     const height = 60
-    const points = 7
-    const data = Array.from({ length: points }, () => Math.random() * 40 + 10)
+    
+    // Use real history or mock if empty
+    const data = displayHistory.length > 1 
+      ? displayHistory 
+      : [0, 10, 5, 20, 15, 30, 25]; // Slight mock for empty states
+    
+    const points = data.length
     
     // Draw gradient line
     const gradient = ctx.createLinearGradient(0, 0, width, 0)
     gradient.addColorStop(0, '#ff4d00')
-    gradient.addColorStop(0.25, '#ff00aa')
-    gradient.addColorStop(0.5, '#bf5fff')
-    gradient.addColorStop(0.75, '#00e5ff')
     gradient.addColorStop(1, '#39ff14')
     
+    ctx.clearRect(0, 0, width, height + 20)
     ctx.beginPath()
-    ctx.moveTo(0, height - data[0])
+    
+    const getX = (i: number) => (i / (points - 1)) * width
+    const getY = (val: number) => height - (Math.min(val, 100) / 100) * height
+    
+    ctx.moveTo(getX(0), getY(data[0]))
     data.forEach((val, i) => {
-      const x = (i / (points - 1)) * width
-      const y = height - val
-      ctx.lineTo(x, y)
+      ctx.lineTo(getX(i), getY(val))
     })
+    
     ctx.strokeStyle = gradient
-    ctx.lineWidth = 2
+    ctx.lineWidth = 3
+    ctx.lineJoin = 'round'
     ctx.stroke()
     
     // Draw dots
     data.forEach((val, i) => {
-      const x = (i / (points - 1)) * width
-      const y = height - val
       ctx.beginPath()
-      ctx.arc(x, y, 4, 0, Math.PI * 2)
+      ctx.arc(getX(i), getY(val), 4, 0, Math.PI * 2)
       ctx.fillStyle = gradient
       ctx.fill()
     })
-    
-    // X-axis labels
-    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    ctx.font = '10px sans-serif'
-    ctx.fillStyle = '#666'
-    days.forEach((day, i) => {
-      const x = (i / (points - 1)) * width
-      ctx.fillText(day, x - 10, height + 15)
-    })
-  }, [])
-  
-  const categories = [
-    { name: 'Selfie', completed: 2, total: 5, color: '#ff4d00' },
-    { name: 'Action', completed: 3, total: 5, color: '#ff00aa' },
-    { name: 'Object', completed: 1, total: 5, color: '#bf5fff' },
-    { name: 'Food', completed: 0, total: 5, color: '#39ff14' },
-  ]
+  }, [displayHistory])
   
   return (
     <div className="flex flex-col px-4 pt-20 pb-24 gap-4">
@@ -127,7 +139,7 @@ export default function DashboardScreen({
       <div className="grid grid-cols-2 gap-3">
         <div className="p-4 rounded-xl bg-[#0d0d0d] border border-[#222]">
           <div className="text-[10px] text-[#666] uppercase mb-1">Total Points</div>
-          <div className="font-display text-3xl animate-chromatic">{score}</div>
+          <div className="font-display text-3xl animate-chromatic">{displayScore}</div>
         </div>
         <div className="p-4 rounded-xl bg-[#0d0d0d] border border-[#222]">
           <div className="text-[10px] text-[#666] uppercase mb-1">Pass Rate</div>
@@ -135,7 +147,7 @@ export default function DashboardScreen({
         </div>
         <div className="p-4 rounded-xl bg-[#0d0d0d] border border-[#222]">
           <div className="text-[10px] text-[#666] uppercase mb-1">Tasks Done</div>
-          <div className="font-display text-3xl text-[#bf5fff]">{tasksCompleted}</div>
+          <div className="font-display text-3xl text-[#bf5fff]">{displayTasksCompleted}</div>
         </div>
         <div className="p-4 rounded-xl bg-[#0d0d0d] border border-[#222]">
           <div className="text-[10px] text-[#666] uppercase mb-1">Hard Fails</div>
@@ -166,23 +178,27 @@ export default function DashboardScreen({
       <div className="p-4 rounded-xl bg-[#0d0d0d] border border-[#222]">
         <div className="text-xs text-[#666] uppercase mb-3">Category Breakdown</div>
         <div className="flex flex-col gap-3">
-          {categories.map((cat) => (
-            <div key={cat.name} className="flex flex-col gap-1">
-              <div className="flex justify-between text-xs">
-                <span>{cat.name}</span>
-                <span style={{ color: cat.color }}>{cat.completed}/{cat.total}</span>
+          {displayCategories.length === 0 ? (
+             <p className="text-xs text-[#444] italic">No categories yet.</p>
+          ) : (
+            displayCategories.map((cat) => (
+              <div key={cat.name} className="flex flex-col gap-1">
+                <div className="flex justify-between text-xs">
+                  <span>{cat.name}</span>
+                  <span style={{ color: cat.color }}>{cat.completed}/{cat.total}</span>
+                </div>
+                <div className="h-2 rounded-full bg-[#1a1a1a] overflow-hidden">
+                  <div 
+                    className="h-full rounded-full"
+                    style={{ 
+                      width: `${(cat.completed / cat.total) * 100}%`,
+                      backgroundColor: cat.color 
+                    }}
+                  />
+                </div>
               </div>
-              <div className="h-2 rounded-full bg-[#1a1a1a] overflow-hidden">
-                <div 
-                  className="h-full rounded-full"
-                  style={{ 
-                    width: `${(cat.completed / cat.total) * 100}%`,
-                    backgroundColor: cat.color 
-                  }}
-                />
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
       
@@ -218,10 +234,10 @@ export default function DashboardScreen({
       <div className="p-4 rounded-xl bg-[#0d0d0d] border border-[#222]">
         <div className="text-xs text-[#666] uppercase mb-3">Recent Activity</div>
         <div className="flex flex-col gap-2">
-          {recentActivity.length === 0 ? (
+          {displayActivity.length === 0 ? (
             <p className="text-xs text-[#444] italic">No activity yet. Start playing!</p>
           ) : (
-            recentActivity.slice(0, 5).map((activity, i) => (
+            displayActivity.slice(0, 5).map((activity, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span>
                   {activity.type === 'approved' ? '✅' : activity.type === 'rejected' ? '❌' : '⚡'}

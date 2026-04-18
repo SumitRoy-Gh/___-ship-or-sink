@@ -6,11 +6,6 @@ const SEGMENTS = [
   { label: 'EASY', emoji: '🥱', color: '#39ff14', message: "Grandma mode activated. Don't embarrass us." },
   { label: 'MEDIUM', emoji: '😤', color: '#ff4d00', message: "Spicy but survivable. Probably. No promises." },
   { label: 'HARD', emoji: '💀', color: '#ff1744', message: "You chose violence. The chaos gods respect this. 💀" },
-  { label: '2X REWARD', emoji: '💰', color: '#ffd60a', message: "DOUBLE POINTS! The universe owes you. Collect immediately." },
-  { label: 'COUPON', emoji: '🎟️', color: '#00e5ff', message: "🎟️ 15% off your next existential crisis. Valid nowhere." },
-  { label: 'SKIP PASS', emoji: '🛡️', color: '#bf5fff', message: "Get out of jail free card. You coward. Use it wisely." },
-  { label: 'CHAOS MODE', emoji: '🌀', color: '#ff00aa', message: "ALL rules are now suggestions. Absolute anarchy unlocked. 🌀" },
-  { label: 'MYSTERY', emoji: '❓', color: '#888888', message: "We genuinely have no idea. Neither does the AI. Could be anything." },
 ]
 
 interface SpinScreenProps {
@@ -184,12 +179,14 @@ export default function SpinScreen({ onSpinResult, lastResult }: SpinScreenProps
         requestAnimationFrame(animate)
       } else {
         // Calculate winning segment
-        const normalizedAngle = currentRotation % (Math.PI * 2)
+        // The wheel segments start at -PI/2 (Top).
+        // If the wheel rotates clockwise by R, the segment that ends up at the pointer is at -R on the original wheel.
+        const normalizedRotation = (currentRotation % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)
         const segmentAngle = (Math.PI * 2) / SEGMENTS.length
-        // Pointer is at top, so we need to adjust
-        const adjustedAngle = (Math.PI * 2 - normalizedAngle + Math.PI / 2) % (Math.PI * 2)
-        const segmentIndex = Math.floor(adjustedAngle / segmentAngle) % SEGMENTS.length
         
+        // At rotation 0, segment 0 is at the top.
+        // As rotation increases (clockwise), we move backwards through the indices.
+        const segmentIndex = Math.floor((Math.PI * 2 - (normalizedRotation % (Math.PI * 2))) / segmentAngle) % SEGMENTS.length
         setIsSpinning(false)
         setShowConfetti(true)
         onSpinResult(SEGMENTS[segmentIndex])

@@ -16,7 +16,7 @@ import TaskScreen from '@/components/screens/TaskScreen'
 import UploadScreen from '@/components/screens/UploadScreen'
 import ResultScreen from '@/components/screens/ResultScreen'
 import ScoreScreen from '@/components/screens/ScoreScreen'
-import { startSession, getTask, verifyTask, postReward } from '@/lib/api'
+import { startSession, getTask, verifyTask, postReward, getStats } from '@/lib/api'
 
 type Tab = 'home' | 'spin' | 'board' | 'dash' | 'bug'
 type GameScreen = 'none' | 'difficulty' | 'task' | 'upload' | 'result' | 'score'
@@ -131,10 +131,47 @@ export default function ChaosTasks() {
     init()
   }, [])
   
+  const [dashboardStats, setDashboardStats] = useState<any | null>(null)
+
   // Handle tab change
-  const handleTabChange = useCallback((tab: Tab) => {
+  const handleTabChange = useCallback(async (tab: Tab) => {
     setActiveTab(tab)
     setGameScreen('none')
+    setChaosTrigger(true)
+    
+    if (tab === 'dash' && playerId) {
+      try {
+        const stats = await getStats(playerId)
+        setDashboardStats(stats)
+      } catch (err) {
+        console.error('Failed to fetch dashboard stats:', err)
+      }
+    }
+  }, [playerId])
+  
+  // Handle back navigation
+  const handleBack = useCallback(() => {
+    if (activeTab !== 'home') {
+      setActiveTab('home')
+      setGameScreen('none')
+      return
+    }
+
+    if (gameScreen === 'difficulty') setGameScreen('none')
+    else if (gameScreen === 'task') setGameScreen('difficulty')
+    else if (gameScreen === 'upload') setGameScreen('task')
+    else if (gameScreen === 'result') setGameScreen('none')
+    else if (gameScreen === 'score') setGameScreen('none')
+    
+    setChaosTrigger(true)
+  }, [activeTab, gameScreen])
+
+  // Handle home navigation (reset everything)
+  const handleHome = useCallback(() => {
+    setActiveTab('home')
+    setGameScreen('none')
+    setCurrentTask(null)
+    setResult(null)
     setChaosTrigger(true)
   }, [])
   
@@ -267,12 +304,16 @@ export default function ChaosTasks() {
     setSpinResult(result)
     addActivity('spin', `Got "${result.label}"`, 0)
     
-    if (result.label === '2X REWARD') {
-      setHasDoublePoints(true)
-    } else if (result.label === 'SKIP PASS') {
-      setHasSkipPass(true)
+    // Auto-fetch task based on spin result
+    const label = result.label.toLowerCase() as Difficulty
+    if (['easy', 'medium', 'hard'].includes(label)) {
+      setDifficulty(label)
+      // Small delay so user can see the result card
+      setTimeout(() => {
+        fetchTask(label)
+      }, 1500)
     }
-  }, [addActivity])
+  }, [addActivity, fetchTask])
   
   // Reset chaos trigger
   useEffect(() => {
@@ -293,8 +334,14 @@ export default function ChaosTasks() {
   // Render game screens (overlay mode)
   if (gameScreen !== 'none') {
     return (
-      <main className="min-h-screen bg-[#060606] overflow-x-hidden">
+      <main className="min-h-screen bg-[#060606] overflow-x-hidden pt-20">
         <ParticleBackground />
+        <Header 
+          score={score} 
+          showBack={true}
+          onBack={handleBack}
+          onHome={handleHome}
+        />
         <ChaosOverlay triggerOnAction={chaosTrigger} onTriggerHandled={() => setChaosTrigger(false)} />
         
         {/* Active bonuses display */}
@@ -357,7 +404,12 @@ export default function ChaosTasks() {
   return (
     <main className="min-h-screen bg-[#060606] overflow-x-hidden">
       <ParticleBackground />
-      <Header score={score} />
+      <Header 
+        score={score} 
+        showBack={activeTab !== 'home' || gameScreen !== 'none'}
+        onBack={handleBack}
+        onHome={handleHome}
+      />
       <ChaosOverlay triggerOnAction={chaosTrigger} onTriggerHandled={() => setChaosTrigger(false)} />
       
       <div className="max-w-[480px] mx-auto">
@@ -381,6 +433,7 @@ export default function ChaosTasks() {
         
         {activeTab === 'dash' && (
           <DashboardScreen 
+            stats={dashboardStats}
             score={score}
             tasksCompleted={tasksCompleted}
             passedTasks={passedTasks}

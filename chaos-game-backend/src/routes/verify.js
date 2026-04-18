@@ -38,32 +38,26 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
-// Helper to extract middle frame from video
-const extractFrame = (videoPath) => {
-  return new Promise((resolve, reject) => {
-    const outputPath = videoPath + '-frame.png';
-    
-    ffmpeg.ffprobe(videoPath, (err, metadata) => {
-      if (err) return reject(err);
-      
-      const duration = metadata.format.duration;
-      const midpoint = duration / 2;
-
+// Helper to extract multiple frames from video
+const extractFrames = (videoPath, timestamps) => {
+  return Promise.all(timestamps.map((ts, index) => {
+    return new Promise((resolve, reject) => {
+      const outputPath = `${videoPath}-frame-${index}.png`;
       ffmpeg(videoPath)
         .screenshots({
-          timestamps: [midpoint],
+          timestamps: [ts],
           filename: path.basename(outputPath),
           folder: path.dirname(outputPath),
         })
         .on('end', () => resolve(outputPath))
         .on('error', (err) => reject(err));
     });
-  });
+  }));
 };
 
 router.post('/', upload.single('image'), async (req, res) => {
   const filePath = req.file ? req.file.path : null;
-  let tempFramePath = null;
+  let tempFramePaths = [];
 
   try {
     if (!req.file) {
@@ -75,29 +69,46 @@ router.post('/', upload.single('image'), async (req, res) => {
     
     console.log(`[Verify] Processing ${isVideo ? 'video' : 'photo'} for task: ${taskLabel}`);
 
-    let pathToVerify = filePath;
+    let pathsToVerify = [];
 
     if (isVideo) {
-      console.log(`[Verify] Extracting frame from video...`);
-      tempFramePath = await extractFrame(filePath);
-      pathToVerify = tempFramePath;
+      // Get duration to pick timestamps
+      const metadata = await new Promise((resolve, reject) => {
+        ffmpeg.ffprobe(filePath, (err, meta) => err ? reject(err) : resolve(meta));
+      });
+      const duration = metadata.format.duration || 1;
+      const timestamps = [duration * 0.2, duration * 0.5, duration * 0.8];
+      
+      console.log(`[Verify] Extracting ${timestamps.length} frames at ${timestamps.map(t => t.toFixed(1)).join(', ')}s...`);
+      tempFramePaths = await extractFrames(filePath, timestamps);
+      pathsToVerify = tempFramePaths;
+    } else {
+      pathsToVerify = [filePath];
     }
 
-    // AI Verification
-    const result = await verifyImage(pathToVerify, taskLabel);
+    // AI Verification for all frames
+    const results = await Promise.all(pathsToVerify.map(path => verifyImage(path, taskLabel)));
     
-    // AI Judgment
-    const judgment = await generateJudgment(taskText, result.passed);
+    // Majority Vote Logic
+    const passedCount = results.filter(r => r.passed).length;
+    const isApproved = isVideo ? (passedCount >= 2) : (passedCount >= 1);
+    
+    // Pick the most confident result for logging
+    const bestResult = results.sort((a, b) => b.confidence - a.confidence)[0];
 
-    console.log(`[Verify] Result for task: "${result.passed ? 'PASSED' : 'FAILED'}"`);
-    console.log(`[Verify] Confidence: ${result.confidence.toFixed(2)} | Label: ${result.topLabel}`);
+    // AI Judgment
+    const judgment = await generateJudgment(taskText, isApproved);
+
+    console.log(`[Verify] Results: ${passedCount}/${results.length} frames passed.`);
+    console.log(`[Verify] Final Verdict: "${isApproved ? 'PASSED' : 'FAILED'}"`);
+    console.log(`[Verify] Max Confidence: ${bestResult.confidence.toFixed(2)} | Label: ${bestResult.topLabel}`);
 
     res.json({
-      passed: result.passed,
-      topLabel: result.topLabel,
-      confidence: result.confidence,
+      passed: isApproved,
+      topLabel: bestResult.topLabel,
+      confidence: bestResult.confidence,
       mediaType: req.file.mimetype,
-      judgment: result.passed ? "Chaos Master is satisfied... for now." : "The Chaos Master mocks your pathetic attempt."
+      judgment: judgment
     });
 
   } catch (error) {
@@ -106,7 +117,9 @@ router.post('/', upload.single('image'), async (req, res) => {
   } finally {
     // Cleanup
     if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    if (tempFramePath && fs.existsSync(tempFramePath)) fs.unlinkSync(tempFramePath);
+    tempFramePaths.forEach(p => {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    });
   }
 });
 

@@ -55,6 +55,17 @@ export async function postReward(sessionId: string, taskText: string, passed: bo
   }
 }
 
+export async function getStats(sessionId: string) {
+  const response = await axios.get(`${API_BASE}/api/session/${sessionId}/stats`)
+  return response.data as {
+    score: number;
+    tasksCompleted: number;
+    categories: Array<{ name: string; completed: number; total: number; color: string }>;
+    history: number[];
+    recentActivity: Array<{ type: 'approved' | 'rejected' | 'spin'; text: string; points: number; time: string }>;
+  }
+}
+
 export async function getLeaderboard() {
   const response = await axios.get(`${API_BASE}/api/leaderboard`)
   return response.data as Array<{

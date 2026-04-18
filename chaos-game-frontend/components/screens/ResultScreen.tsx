@@ -43,7 +43,7 @@ export default function ResultScreen({ passed, message, confidence, points, onNe
           className={`text-[64px] ${passed ? 'animate-bounce-subtle' : 'animate-shake'}`}
           style={{ animationIterationCount: passed ? 'infinite' : '1' }}
         >
-          {passed ? '&#127942;' : '&#128128;'}
+          {passed ? '🏆' : '💀'}
         </span>
         
         {/* Result text */}
