@@ -28,6 +28,8 @@ export const viewport: Viewport = {
   userScalable: false,
 }
 
+import AuthProvider from '@/components/AuthProvider'
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -36,7 +38,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${bangers.variable} bg-[#080808]`} suppressHydrationWarning>
       <body className="font-sans antialiased bg-[#080808] text-[#f5f5f5] min-h-screen">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

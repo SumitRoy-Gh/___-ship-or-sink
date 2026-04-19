@@ -45,6 +45,7 @@ const taskRoute    = require('./routes/task');
 const verifyRoute  = require('./routes/verify');
 const rewardRoute  = require('./routes/reward');
 const sessionRoute = require('./routes/session');
+const authRoute    = require('./routes/auth');
 
 // Connect Database
 const db = require('./database/db');
@@ -53,6 +54,7 @@ app.use('/api/task',    taskRoute);
 app.use('/api/verify',  verifyRoute);
 app.use('/api/reward',  rewardRoute);
 app.use('/api/session', sessionRoute);
+app.use('/api/auth',    authRoute);
 
 // Global Leaderboard Route
 app.get('/api/leaderboard', (req, res) => {

@@ -16,6 +16,7 @@ import TaskScreen from '@/components/screens/TaskScreen'
 import UploadScreen from '@/components/screens/UploadScreen'
 import ResultScreen from '@/components/screens/ResultScreen'
 import ScoreScreen from '@/components/screens/ScoreScreen'
+import { useSession } from 'next-auth/react'
 import { startSession, getTask, verifyTask, postReward, getStats } from '@/lib/api'
 
 type Tab = 'home' | 'spin' | 'board' | 'dash' | 'bug'
@@ -71,6 +72,9 @@ const MOCK_RESPONSES = {
 }
 
 export default function ChaosTasks() {
+  const { data: session } = useSession()
+  const accessToken = (session as any)?.accessToken
+
   const [activeTab, setActiveTab] = useState<Tab>('home')
   const [gameScreen, setGameScreen] = useState<GameScreen>('none')
   const [playerId, setPlayerId] = useState<string | null>(null)
@@ -102,7 +106,7 @@ export default function ChaosTasks() {
   const fetchTask = useCallback(async (diff: Difficulty) => {
     setIsLoading(true)
     try {
-      const task = await getTask(diff, playerId || undefined)
+      const task = await getTask(diff, playerId || undefined, accessToken)
       setCurrentTask(task)
       setGameScreen('task')
     } catch (err) {
@@ -111,24 +115,24 @@ export default function ChaosTasks() {
       alert('Failed to get task from AI. Check your backend is running!')
     }
     setIsLoading(false)
-  }, [playerId])
+  }, [playerId, accessToken])
 
   // Initialize Session
   useEffect(() => {
     const init = async () => {
       try {
-        const session = await startSession()
-        setPlayerId(session.sessionId)
-        setScore(session.score)
-        setTasksCompleted(session.tasksCompleted)
-        console.log('[Chaos] Session initialized:', session.sessionId)
+        const data = await startSession(accessToken)
+        setPlayerId(data.sessionId)
+        setScore(data.score)
+        setTasksCompleted(data.tasksCompleted)
+        console.log('[Chaos] Session initialized:', data.sessionId)
       } catch (err) {
         console.error('Failed to init session:', err)
-        setPlayerId('player_' + Math.random().toString(36).slice(2, 8))
+        if (!playerId) setPlayerId('player_' + Math.random().toString(36).slice(2, 8))
       }
     }
     init()
-  }, [])
+  }, [accessToken])
   
   const [dashboardStats, setDashboardStats] = useState<any | null>(null)
 
@@ -140,13 +144,13 @@ export default function ChaosTasks() {
     
     if (tab === 'dash' && playerId) {
       try {
-        const stats = await getStats(playerId)
+        const stats = await getStats(playerId, accessToken)
         setDashboardStats(stats)
       } catch (err) {
         console.error('Failed to fetch dashboard stats:', err)
       }
     }
-  }, [playerId])
+  }, [playerId, accessToken])
   
   // Handle back navigation
   const handleBack = useCallback(() => {
@@ -224,13 +228,14 @@ export default function ChaosTasks() {
     setChaosTrigger(true)
     
     try {
-      const response = await verifyTask(file, currentTask.taskLabel, currentTask.task)
+      const response = await verifyTask(file, currentTask.taskLabel, currentTask.task, accessToken)
       
       const rewardResponse = await postReward(
         playerId,
         currentTask.task,
         response.passed,
-        difficulty
+        difficulty,
+        accessToken
       )
       
       const { pointsEarned, totalScore, judgment } = rewardResponse
@@ -274,7 +279,7 @@ export default function ChaosTasks() {
     }
     setIsLoading(false)
     setGameScreen('result')
-  }, [currentTask, playerId, hasDoublePoints, difficulty, addActivity])
+  }, [currentTask, playerId, hasDoublePoints, difficulty, addActivity, accessToken])
   
   // Handle next task
   const handleNextTask = useCallback(() => {
@@ -339,6 +344,7 @@ export default function ChaosTasks() {
           showBack={true}
           onBack={handleBack}
           onHome={handleHome}
+          onNavigate={setActiveTab}
         />
         <ChaosOverlay triggerOnAction={chaosTrigger} onTriggerHandled={() => setChaosTrigger(false)} />
         
@@ -407,6 +413,7 @@ export default function ChaosTasks() {
         showBack={activeTab !== 'home' || gameScreen !== 'none'}
         onBack={handleBack}
         onHome={handleHome}
+        onNavigate={setActiveTab}
       />
       <ChaosOverlay triggerOnAction={chaosTrigger} onTriggerHandled={() => setChaosTrigger(false)} />
       

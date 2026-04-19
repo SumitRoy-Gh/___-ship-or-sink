@@ -1,15 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getLeaderboard } from '@/lib/api'
 
-const LEADERBOARD = [
-  { rank: 1, emoji: '👑', name: 'ChaosLord_99', badge: 'CHAOS MASTER', score: 1420, color: '#ffd60a' },
-  { rank: 2, emoji: '🔥', name: 'ToastDestroyer', badge: 'Absolutely Feral', score: 1100, color: '#c0c0c0' },
-  { rank: 3, emoji: '💀', name: 'PickleRick2k', badge: 'Certified Unhinged', score: 980, color: '#cd7f32' },
-  { rank: 4, emoji: '🐔', name: 'NoodleArms', badge: 'Clown Apprentice', score: 750, color: '#ff4d00' },
-  { rank: 5, emoji: '🎪', name: 'QuantumClown', badge: 'Chaotically Neutral', score: 640, color: '#ff00aa' },
-  { rank: 6, emoji: '🍞', name: 'BreadSentinel', badge: 'Mild Disaster', score: 500, color: '#bf5fff' },
-  { rank: 7, emoji: '😈', name: 'VoidWalker_X', badge: 'Suspiciously Calm', score: 410, color: '#00e5ff' },
-]
+// Leaderboard component
 
 interface LeaderboardScreenProps {
   userScore: number
@@ -51,6 +43,9 @@ export default function LeaderboardScreen({ userScore }: LeaderboardScreenProps)
     : userScore < 800 ? 'Certified Menace'
     : 'Chaos Apprentice'
   
+  // Footer taunt
+  const topPlayer = displayPlayers[0]?.name || "ChaosLord"
+
   return (
     <div className="flex flex-col px-4 pt-20 pb-24">
       {/* Heading */}
@@ -68,7 +63,7 @@ export default function LeaderboardScreen({ userScore }: LeaderboardScreenProps)
             LOADING THE CHAOS...
           </div>
         ) : displayPlayers.length === 0 ? (
-          <div className="text-center py-10 text-[#444]">
+          <div className="text-center py-10 text-[#444] border-2 border-dashed border-white/5 rounded-2xl italic text-sm">
             No one has dared to play yet.
           </div>
         ) : (
@@ -114,7 +109,7 @@ export default function LeaderboardScreen({ userScore }: LeaderboardScreenProps)
         )}
         
         {/* User row */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-[#0d0d0d] border-2 animate-rborder">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-[#0d0d0d] border-2 animate-rborder mt-4">
           {/* Rank */}
           <div className="font-display text-xl w-8 text-center animate-chromatic">
             {userRank}
@@ -149,7 +144,7 @@ export default function LeaderboardScreen({ userScore }: LeaderboardScreenProps)
       
       {/* Footer taunt */}
       <p className="text-[10px] text-[#444] text-center">
-        Think you can beat ChaosLord_99? Cute.
+        Think you can beat {topPlayer}? Cute.
       </p>
     </div>
   )

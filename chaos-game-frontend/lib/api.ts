@@ -2,32 +2,35 @@ import axios from 'axios'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
 
-export async function startSession() {
-  const response = await axios.post(`${API_BASE}/api/session/start`)
+export async function startSession(token?: string) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  const response = await axios.post(`${API_BASE}/api/session/start`, {}, { headers })
   return response.data as { sessionId: string; score: number; tasksCompleted: number }
 }
 
-export async function getSession(sessionId: string) {
-  const response = await axios.get(`${API_BASE}/api/session/${sessionId}`)
+export async function getSession(sessionId: string, token?: string) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  const response = await axios.get(`${API_BASE}/api/session/${sessionId}`, { headers })
   return response.data as { score: number; tasksCompleted: number }
 }
 
-export async function getTask(difficulty: string, sessionId?: string) {
-  const response = await axios.post(`${API_BASE}/api/task`, { difficulty, sessionId })
+export async function getTask(difficulty: string, sessionId?: string, token?: string) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  const response = await axios.post(`${API_BASE}/api/task`, { difficulty, sessionId }, { headers })
   return response.data as { task: string; taskLabel: string; difficulty: string }
 }
 
-export async function verifyTask(image: File, taskLabel: string, taskText: string) {
+export async function verifyTask(image: File, taskLabel: string, taskText: string, token?: string) {
   const formData = new FormData()
   formData.append('image', image)
   formData.append('taskLabel', taskLabel)
   formData.append('taskText', taskText)
   
-  const response = await axios.post(`${API_BASE}/api/verify`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  })
+  const headers: any = { 'Content-Type': 'multipart/form-data' }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const response = await axios.post(`${API_BASE}/api/verify`, formData, { headers })
   
-  // Backend returns: { passed, topLabel, confidence, mediaType, judgment }
   return response.data as { 
     passed: boolean; 
     mediaType: string; 
@@ -36,15 +39,15 @@ export async function verifyTask(image: File, taskLabel: string, taskText: strin
   }
 }
 
-export async function postReward(sessionId: string, taskText: string, passed: boolean, difficulty: string) {
+export async function postReward(sessionId: string, taskText: string, passed: boolean, difficulty: string, token?: string) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
   const response = await axios.post(`${API_BASE}/api/reward`, {
     sessionId,
     taskText,
     passed,
     difficulty
-  })
+  }, { headers })
   
-  // Backend returns: { passed, pointsEarned, totalScore, judgment, unlockedRewards, allRewards }
   return response.data as {
     passed: boolean;
     pointsEarned: number;
@@ -55,8 +58,9 @@ export async function postReward(sessionId: string, taskText: string, passed: bo
   }
 }
 
-export async function getStats(sessionId: string) {
-  const response = await axios.get(`${API_BASE}/api/session/${sessionId}/stats`)
+export async function getStats(sessionId: string, token?: string) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  const response = await axios.get(`${API_BASE}/api/session/${sessionId}/stats`, { headers })
   return response.data as {
     score: number;
     tasksCompleted: number;
